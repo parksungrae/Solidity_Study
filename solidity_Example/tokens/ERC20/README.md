@@ -1,3 +1,3 @@
 Analyze Openzeppline's ERC20 token Code
 -korean
--simple (but it's not sure)
+-simple (but the information is not sure)

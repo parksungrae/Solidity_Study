@@ -114,8 +114,8 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
      *
      * Requirements:
      *
-     * - `recipient` cannot be the zero address.
-     * - the caller must have a balance of at least `amount`.
+     * `recipient` 는 빈 address가 될 수 없음
+     * transfer를 call하는 caller는  `amount` 이상의 토큰을 가지고있어야함.
      */
     function transfer(address recipient, uint256 amount) public virtual override returns (bool) {
         // _는 대부분 private, internal 함수를 사용할 때 쓰임
@@ -139,7 +139,7 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
      *
      * Requirements:
      *
-     * - `spender` cannot be the zero address.
+     * - `spender`는 빈 address가 될 수 없음.
      */
     function approve(address spender, uint256 amount) public virtual override returns (bool) {
         _approve(_msgSender(), spender, amount);
@@ -148,9 +148,6 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
 
     /**
      * @dev allowance를 이용하여 남의 돈을 보낼 때 사용하는 함수
-     *
-     * Emits an {Approval} event indicating the updated allowance. This is not
-     * required by the EIP. See the note at the beginning of {ERC20}.
      *
      * Requirements:
      *
