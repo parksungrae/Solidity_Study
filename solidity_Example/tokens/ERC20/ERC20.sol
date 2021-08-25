@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 
+//solidity version 설정 ^는 0.8중 0.8.0 이상을 의미
 pragma solidity ^0.8.0;
 
+//import로 다른 sol파일 불러오기
 import "./IERC20.sol";
 import "./IERC20Metadata.sol";
-import "./Context.sol";
+import "../utils/Context.sol";
 
 /**
  * @dev Implementation of the {IERC20} interface.
@@ -133,7 +135,7 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
     }
 
     /**
-     * @dev See {IERC20-approve}.
+     * @dev amount만큼 allowance를 할당해주다고 승인하는 함수
      *
      * Requirements:
      *
@@ -165,6 +167,9 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
         //token을 보낼 (address)에 대해 보내게 할 (_msgSender)가 얼마의 (allowance) 값을 가지고 있나
         uint256 currentAllowance = _allowances[sender][_msgSender()];
         require(currentAllowance >= amount, "ERC20: transfer amount exceeds allowance");
+
+        //uncheck -> overflow체크를 하지 않겠다
+        //overflow가 절대 일어나지 않는 곳에 unchecked를 사용할 시 Gas를 절약할 수 있기에
         unchecked {
             _approve(sender, _msgSender(), currentAllowance - amount);
         }
@@ -172,38 +177,29 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
         return true;
     }
 
+    //{increaseAllowance}, {decreaseAllowance}는 일반 {approve}의 취약점(approve 함수와 allowance 사용 함수가 동시 실행되었을 때 allowance 사용이 approve보다 빠를 때)을 줄이기 위해
+
     /**
-     * @dev Atomically increases the allowance granted to `spender` by the caller.
+     * @dev allowance양을 늘리는 함수.
      *
-     * This is an alternative to {approve} that can be used as a mitigation for
-     * problems described in {IERC20-approve}.
-     *
-     * Emits an {Approval} event indicating the updated allowance.
-     *
-     * Requirements:
-     *
-     * - `spender` cannot be the zero address.
+     * spender는 0이 될 수 없음
      */
     function increaseAllowance(address spender, uint256 addedValue) public virtual returns (bool) {
+
+        //addedValue : 더할 allowance
         _approve(_msgSender(), spender, _allowances[_msgSender()][spender] + addedValue);
         return true;
     }
 
     /**
-     * @dev Atomically decreases the allowance granted to `spender` by the caller.
-     *
-     * This is an alternative to {approve} that can be used as a mitigation for
-     * problems described in {IERC20-approve}.
-     *
-     * Emits an {Approval} event indicating the updated allowance.
-     *
-     * Requirements:
-     *
-     * - `spender` cannot be the zero address.
-     * - `spender` must have allowance for the caller of at least
-     * `subtractedValue`.
+     * @dev allowance양을 줄이는 함수.
+     * 
+     * spender는 0이 될 수 없음
      */
     function decreaseAllowance(address spender, uint256 subtractedValue) public virtual returns (bool) {
+
+        //subtractedValue : 감할 allowance 양
+
         uint256 currentAllowance = _allowances[_msgSender()][spender];
         require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero");
         unchecked {
@@ -219,25 +215,26 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
      * This internal function is equivalent to {transfer}, and can be used to
      * e.g. implement automatic token fees, slashing mechanisms, etc.
      *
-     * Emits a {Transfer} event.
-     *
      * Requirements:
      *
-     * - `sender` cannot be the zero address.
-     * - `recipient` cannot be the zero address.
-     * - `sender` must have a balance of at least `amount`.
+     * - `sender`와 `recipient` 는 빈 address를 쓸 수 없다
      */
     function _transfer(
         address sender,
         address recipient,
         uint256 amount
     ) internal virtual {
+
+        //잔고 확인
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
 
         _beforeTokenTransfer(sender, recipient, amount);
 
+        //A가 B에 만원을 보낸다 했을 때 A에서 만원 차감 B에 만원 추가를 하는 작업
         uint256 senderBalance = _balances[sender];
+
+        //큰수에서 작은수를 빼는작업이기 때문에 unchecked
         require(senderBalance >= amount, "ERC20: transfer amount exceeds balance");
         unchecked {
             _balances[sender] = senderBalance - amount;
@@ -249,14 +246,9 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
         _afterTokenTransfer(sender, recipient, amount);
     }
 
-    /** @dev Creates `amount` tokens and assigns them to `account`, increasing
-     * the total supply.
+    /** @dev 토큰의 총 공급량을 감소시키고 그만큼 발행함
      *
-     * Emits a {Transfer} event with `from` set to the zero address.
-     *
-     * Requirements:
-     *
-     * - `account` cannot be the zero address.
+     * address 0 에서 address 0 으로는 불가능
      */
     function _mint(address account, uint256 amount) internal virtual {
         require(account != address(0), "ERC20: mint to the zero address");
@@ -265,21 +257,17 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
 
         _totalSupply += amount;
         _balances[account] += amount;
+
+        //Transfer event를 address(0) 코인베이스에서 발행함으로 실행함
         emit Transfer(address(0), account, amount);
 
         _afterTokenTransfer(address(0), account, amount);
     }
 
     /**
-     * @dev Destroys `amount` tokens from `account`, reducing the
-     * total supply.
-     *
-     * Emits a {Transfer} event with `to` set to the zero address.
-     *
-     * Requirements:
-     *
-     * - `account` cannot be the zero address.
-     * - `account` must have at least `amount` tokens.
+     * @dev account에서 일정량의 토큰을 빈 계좌로 보냄으로서 토큰을 사용못하게 하고
+     * 총공급량을 감소함
+     * 빈 address에서는 소각이 불가능하다
      */
     function _burn(address account, uint256 amount) internal virtual {
         require(account != address(0), "ERC20: burn from the zero address");
@@ -319,47 +307,40 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
         require(owner != address(0), "ERC20: approve from the zero address");
         require(spender != address(0), "ERC20: approve to the zero address");
 
+        //owner가 spender에게 amount만큼 토큰을 사용할 수 있도록 허용
         _allowances[owner][spender] = amount;
+
+        //승인 이벤트인 approval 실행
         emit Approval(owner, spender, amount);
     }
 
     /**
-     * @dev Hook that is called before any transfer of tokens. This includes
-     * minting and burning.
+     * @dev {transfer} 전에 override하여 사용 가능한 함수
      *
-     * Calling conditions:
-     *
-     * - when `from` and `to` are both non-zero, `amount` of ``from``'s tokens
-     * will be transferred to `to`.
-     * - when `from` is zero, `amount` tokens will be minted for `to`.
-     * - when `to` is zero, `amount` of ``from``'s tokens will be burned.
-     * - `from` and `to` are never both zero.
-     *
-     * To learn more about hooks, head to xref:ROOT:extending-contracts.adoc#using-hooks[Using Hooks].
+     * 두 주소가 모두 0이 아닐 경우 전송됨
+     * 잔고가 0일경우 실패
+     * 0의 address로 보낼 경우 토큰은 소각됨(burned)
      */
     function _beforeTokenTransfer(
         address from,
         address to,
         uint256 amount
-    ) internal virtual {}
+    ) internal virtual {
+        //require문 등으로 custom
+    }
 
     /**
-     * @dev Hook that is called after any transfer of tokens. This includes
-     * minting and burning.
+     * @dev {transfer} 후에 override하여 사용 가능한 함수
      *
-     * Calling conditions:
-     *
-     * - when `from` and `to` are both non-zero, `amount` of ``from``'s tokens
-     * has been transferred to `to`.
-     * - when `from` is zero, `amount` tokens have been minted for `to`.
-     * - when `to` is zero, `amount` of ``from``'s tokens have been burned.
-     * - `from` and `to` are never both zero.
-     *
-     * To learn more about hooks, head to xref:ROOT:extending-contracts.adoc#using-hooks[Using Hooks].
+     * 두 주소가 모두 0이 아닐 경우 전송됨
+     * 잔고가 0일경우 실패
+     * 0의 address로 보낼 경우 토큰은 소각됨(burned)
      */
     function _afterTokenTransfer(
         address from,
         address to,
         uint256 amount
-    ) internal virtual {}
+    ) internal virtual {
+        //require문 등으로 custom
+    }
 }
